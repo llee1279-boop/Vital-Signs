@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>ATU Sim — Vital Signs</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Segoe UI',Arial,sans-serif;background:#f5f7f5;min-height:100vh;font-size:14px;}
+:root{--green:#4a7c59;--dark:#2d4f38;--gold:#c9a84c;--light:#eef4f0;}
+#header{background:var(--dark);padding:12px 18px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;}
+#header .title{color:var(--gold);font-weight:800;font-size:15px;letter-spacing:1px;}
+#header .sub{color:#adc8b5;font-size:11px;}
+.status-dot{width:9px;height:9px;border-radius:50%;background:#aaa;display:inline-block;margin-right:5px;}
+.status-dot.connected{background:#2ecc71;}
+.status-dot.error{background:#e74c3c;}
+#conn-label{color:#adc8b5;font-size:11px;display:flex;align-items:center;gap:4px;}
+#main{padding:16px;max-width:820px;margin:0 auto;}
+.simtime-box{background:#fff;border:2px solid var(--green);border-radius:8px;padding:12px 14px;margin-bottom:14px;}
+.simtime-box label{font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:4px;}
+.simtime-box input{width:100%;border:none;font-size:16px;font-weight:700;color:var(--dark);font-family:inherit;outline:none;}
+.simtime-box .hint{font-size:11px;color:#999;margin-top:3px;}
+.vs-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px;margin-bottom:14px;}
+.vs-field label{font-size:11px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:3px;}
+.vs-field input,.vs-field select{width:100%;padding:8px 9px;border:1px solid #ccc;border-radius:6px;font-size:14px;font-family:inherit;}
+.vs-field input:focus,.vs-field select:focus{border-color:var(--green);outline:none;}
+.btn{background:var(--green);color:#fff;border:none;border-radius:8px;padding:11px 24px;font-weight:700;cursor:pointer;font-size:14px;font-family:inherit;}
+.btn:disabled{opacity:0.6;cursor:default;}
+.section{margin-top:18px;}
+.section-title{border-left:4px solid var(--green);padding-left:10px;margin-bottom:10px;font-weight:700;color:var(--dark);font-size:12px;text-transform:uppercase;letter-spacing:1px;}
+.section-title.red{border-color:#e74c3c;}
+.alert-list{display:flex;flex-direction:column;gap:6px;}
+.alert-item{display:flex;gap:10px;align-items:flex-start;border-radius:6px;padding:9px 12px;font-size:13px;line-height:1.5;}
+.alert-item.critical{background:#fff0f0;border:1px solid #e74c3c;border-left:5px solid #e74c3c;color:#922b21;}
+.alert-item.warning{background:#fff8e6;border:1px solid #f39c12;border-left:5px solid #f39c12;color:#7d6608;}
+.aicon{font-size:15px;flex-shrink:0;margin-top:1px;}
+.disclaimer{font-size:12px;color:#999;font-style:italic;margin-top:4px;}
+.news-box{display:flex;align-items:center;gap:14px;background:#fff;border-radius:8px;padding:12px 16px;border:2px solid #ccc;margin-bottom:4px;}
+.news-score{border-radius:50%;width:52px;height:52px;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;flex-shrink:0;}
+.news-label{font-weight:700;font-size:14px;}
+.news-sub{font-size:12px;color:#777;}
+.success-toast{background:#eafaf1;border:1px solid #a9dfbf;border-radius:8px;padding:10px 14px;font-size:13px;color:#1e8449;margin-top:12px;display:none;}
+.success-toast.show{display:block;}
+.tbl-wrap{overflow-x:auto;}
+table{width:100%;border-collapse:collapse;font-size:13px;min-width:560px;}
+thead tr{background:var(--dark);color:#fff;}
+th{padding:8px 10px;text-align:left;font-weight:600;font-size:12px;white-space:nowrap;}
+tbody tr{border-bottom:1px solid #eee;}
+tbody tr.latest td{background:#f0f7f2;}
+tbody tr.alt td{background:#f9f9f9;}
+td{padding:7px 10px;}
+.latest-badge{margin-left:5px;font-size:10px;background:var(--green);color:#fff;border-radius:3px;padding:1px 5px;}
+.news-pill{border-radius:4px;padding:2px 8px;font-weight:700;font-size:12px;}
+.empty{text-align:center;color:#aaa;font-size:13px;padding:24px;background:#fff;border-radius:8px;border:1px dashed #ddd;}
+footer{background:var(--dark);color:#888;text-align:center;padding:9px 20px;font-size:11px;margin-top:28px;}
+@media(max-width:500px){.vs-grid{grid-template-columns:repeat(2,1fr));}}
+</style>
+</head>
+<body>
+
+<div id="header">
+  <div>
+    <div class="title">ATU SCHOOL OF NURSING</div>
+    <div class="sub">Vital Signs — Clinical Decision Support</div>
+  </div>
+  <div id="conn-label"><span class="status-dot" id="conn-dot"></span><span id="conn-text">Connecting...</span></div>
+</div>
+
+<div id="main">
+  <div style="background:#fff;border-radius:8px;padding:16px;border:1px solid #e0e0e0;margin-bottom:4px;">
+    <div class="simtime-box">
+      <label>⏱ Simulation Clock Time</label>
+      <input type="text" id="vs-simtime" placeholder="e.g. 0915, T+10 min, Phase 2..."/>
+      <div class="hint">Enter the scenario clock time for this VS entry.</div>
+    </div>
+    <div class="vs-grid">
+      <div class="vs-field"><label>SBP (mmHg)</label><input type="number" id="vs-sbp" placeholder="e.g. 118"/></div>
+      <div class="vs-field"><label>DBP (mmHg)</label><input type="number" id="vs-dbp" placeholder="e.g. 76"/></div>
+      <div class="vs-field"><label>HR (bpm)</label><input type="number" id="vs-hr" placeholder="e.g. 82"/></div>
+      <div class="vs-field"><label>RR (/min)</label><input type="number" id="vs-rr" placeholder="e.g. 16"/></div>
+      <div class="vs-field"><label>SpO2 (%)</label><input type="number" id="vs-spo2" placeholder="e.g. 98"/></div>
+      <div class="vs-field"><label>Temp (°F)</label><input type="number" step="0.1" id="vs-temp" placeholder="e.g. 98.6"/></div>
+      <div class="vs-field"><label>Pain (0–10)</label><input type="number" id="vs-pain" placeholder="e.g. 4"/></div>
+      <div class="vs-field">
+        <label>AVPU</label>
+        <select id="vs-avpu"><option value="A">Alert</option><option value="V">Voice</option><option value="P">Pain</option><option value="U">Unresponsive</option></select>
+      </div>
+    </div>
+    <button class="btn" id="submit-btn" onclick="submitVitals()">Submit Vitals</button>
+  </div>
+
+  <div class="success-toast" id="toast">✅ Vital signs submitted and saved.</div>
+
+  <div id="news-section" style="display:none;margin-top:16px;">
+    <div class="news-box" id="news-box">
+      <div class="news-score" id="news-circle">—</div>
+      <div><div class="news-label" id="news-label"></div><div class="news-sub">NEWS2 Early Warning Score</div></div>
+    </div>
+  </div>
+
+  <div class="section" id="alert-section" style="display:none;">
+    <div class="section-title red">⚠️ Clinical Decision Support Alerts</div>
+    <div class="alert-list" id="alert-list"></div>
+    <div class="disclaimer" id="disclaimer"></div>
+  </div>
+
+  <div class="section">
+    <div class="section-title" id="log-title">My Vital Signs — This Session</div>
+    <div class="tbl-wrap">
+      <table><thead><tr><th>Sim Time</th><th>Wall Time</th><th>BP</th><th>HR</th><th>RR</th><th>SpO2</th><th>Temp</th><th>Pain</th><th>AVPU</th><th>NEWS2</th></tr></thead>
+      <tbody id="log-body"></tbody></table>
+    </div>
+  </div>
+</div>
+
+<footer>ATU School of Nursing — Simulation Program | Data shared with faculty in real time</footer>
+
+<script>
+const DB = "https://sim-test-983b9-default-rtdb.firebaseio.com/vitals";
+let myEntries = [];
+
+async function fbPost(data) {
+  const res = await fetch(DB + ".json", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(data) });
+  return res.ok;
+}
+
+async function checkConn() {
+  try {
+    await fetch(DB + ".json");
+    document.getElementById('conn-dot').className = 'status-dot connected';
+    document.getElementById('conn-text').textContent = 'Connected';
+  } catch {
+    document.getElementById('conn-dot').className = 'status-dot error';
+    document.getElementById('conn-text').textContent = 'Offline';
+  }
+}
+
+// ── NEWS2 (converts °F to °C internally) ──────────────────────────
+function calcNEWS2(v) {
+  let s = 0;
+  const sbp=parseFloat(v.sbp), rr=parseFloat(v.rr), spo2=parseFloat(v.spo2), hr=parseFloat(v.hr);
+  const tempC = v.temp ? (parseFloat(v.temp) - 32) * 5/9 : null;
+  if(v.sbp){if(sbp<=90)s+=3;else if(sbp<=100)s+=2;else if(sbp<=110)s+=1;else if(sbp>=220)s+=3;}
+  if(v.rr){if(rr<=8)s+=3;else if(rr<=11)s+=1;else if(rr>=25)s+=3;else if(rr>=21)s+=2;}
+  if(v.spo2){if(spo2<=91)s+=3;else if(spo2<=93)s+=2;else if(spo2<=95)s+=1;}
+  if(v.hr){if(hr<=40)s+=3;else if(hr<=50)s+=1;else if(hr>=131)s+=3;else if(hr>=111)s+=2;else if(hr>=91)s+=1;}
+  if(tempC!==null){if(tempC<=35.0)s+=3;else if(tempC<=36.0)s+=1;else if(tempC>=39.1)s+=2;else if(tempC>=38.1)s+=1;}
+  if(v.avpu && v.avpu !== 'A') s += 3;
+  return s;
+}
+
+function newsStyle(score) {
+  if(score>=7) return {bg:'#c0392b',fg:'#fff',label:'HIGH RISK — Urgent escalation'};
+  if(score>=5) return {bg:'#e67e22',fg:'#fff',label:'MEDIUM-HIGH — Urgent review'};
+  if(score>=1) return {bg:'#f39c12',fg:'#333',label:'LOW-MEDIUM — Increased monitoring'};
+  return {bg:'#27ae60',fg:'#fff',label:'LOW — Routine monitoring'};
+}
+
+// ── Generic Adult Alert Engine ─────────────────────────────────────
+function getAlerts(v) {
+  const a = [];
+  const sbp=parseFloat(v.sbp), dbp=parseFloat(v.dbp), hr=parseFloat(v.hr);
+  const rr=parseFloat(v.rr), spo2=parseFloat(v.spo2);
+  const tempF=parseFloat(v.temp), pain=parseFloat(v.pain);
+
+  // ── BLOOD PRESSURE ──────────────────────────────────────────────
+  if(v.sbp) {
+    // Critical high
+    if(sbp >= 180) {
+      a.push({level:'critical', text:`SBP ${v.sbp} mmHg — Severely elevated. Assess for end-organ damage: neuro, renal, cardiac. Notify provider.`, correct:true});
+      a.push({level:'warning',  text:`SBP ${v.sbp} mmHg — Administer oral antihypertensive immediately for fastest BP reduction.`, correct:false});
+    }
+    // Stage 2 HTN
+    else if(sbp >= 140)
+      a.push({level:'warning', text:`SBP ${v.sbp} mmHg — Elevated. Monitor trend; assess symptoms and medication history.`, correct:true});
+    // Hypotension
+    else if(sbp < 90) {
+      a.push({level:'critical', text:`SBP ${v.sbp} mmHg — Hypotension. Assess for cause: hemorrhage, sepsis, cardiogenic, distributive. Notify provider.`, correct:true});
+      a.push({level:'warning',  text:`SBP ${v.sbp} mmHg — Hypotension. Place patient in Trendelenburg position immediately to restore perfusion.`, correct:false});
+    }
+    else if(sbp < 100)
+      a.push({level:'warning', text:`SBP ${v.sbp} mmHg — Low-normal. Reassess frequently; assess for orthostatic changes.`, correct:true});
+  }
+
+  // DBP
+  if(v.dbp && dbp >= 110)
+    a.push({level:'critical', text:`DBP ${v.dbp} mmHg — Severely elevated diastolic. Assess for end-organ damage. Notify provider.`, correct:true});
+
+  // ── HEART RATE ──────────────────────────────────────────────────
+  if(v.hr) {
+    if(hr > 150) {
+      a.push({level:'critical', text:`HR ${v.hr} bpm — Severe tachycardia. Assess rhythm, hemodynamic stability. 12-lead ECG indicated. Notify provider.`, correct:true});
+      a.push({level:'warning',  text:`HR ${v.hr} bpm — Administer IV metoprolol now to slow ventricular rate.`, correct:false});
+    }
+    else if(hr > 100)
+      a.push({level:'warning', text:`HR ${v.hr} bpm — Tachycardia. Identify cause: pain, fever, anxiety, hypovolemia, dysrhythmia, medication effect.`, correct:true});
+    else if(hr < 40) {
+      a.push({level:'critical', text:`HR ${v.hr} bpm — Severe bradycardia. Assess hemodynamic stability and LOC. Notify provider immediately.`, correct:true});
+      a.push({level:'warning',  text:`HR ${v.hr} bpm — Bradycardia. Administer atropine 1 mg IV push now per ACLS protocol.`, correct:false});
+    }
+    else if(hr < 60)
+      a.push({level:'warning', text:`HR ${v.hr} bpm — Bradycardia. Assess symptoms, medication list (beta-blockers, digoxin, CCBs). Monitor.`, correct:true});
+  }
+
+  // ── RESPIRATORY RATE ────────────────────────────────────────────
+  if(v.rr) {
+    if(rr >= 30) {
+      a.push({level:'critical', text:`RR ${v.rr} — Severe tachypnea. Assess airway, work of breathing, O2 sat, lung sounds. Notify provider.`, correct:true});
+      a.push({level:'warning',  text:`RR ${v.rr} — High RR. Administer high-flow O2 via non-rebreather at 15 L/min immediately.`, correct:false});
+    }
+    else if(rr > 20)
+      a.push({level:'warning', text:`RR ${v.rr} — Tachypnea. Assess for pain, anxiety, fever, respiratory compromise, or metabolic acidosis.`, correct:true});
+    else if(rr < 8) {
+      a.push({level:'critical', text:`RR ${v.rr} — Bradypnea. Assess LOC, airway patency, opioid effect. Prepare for airway intervention. Notify provider.`, correct:true});
+      a.push({level:'warning',  text:`RR ${v.rr} — Low RR. Stimulate patient verbally and sternal rub; recheck in 5 minutes before escalating.`, correct:false});
+    }
+    else if(rr < 12)
+      a.push({level:'warning', text:`RR ${v.rr} — Low-normal. Monitor closely; assess for sedation, opioid effect, or neurological change.`, correct:true});
+  }
+
+  // ── SpO2 ────────────────────────────────────────────────────────
+  if(v.spo2) {
+    if(spo2 < 88) {
+      a.push({level:'critical', text:`SpO2 ${v.spo2}% — Critical hypoxemia. Apply high-flow O2, reposition, assess airway. Notify provider immediately.`, correct:true});
+      a.push({level:'warning',  text:`SpO2 ${v.spo2}% — Hypoxemia. Titrate O2 to maintain SpO2 ≥ 99% for maximum tissue oxygenation.`, correct:false});
+    }
+    else if(spo2 < 92)
+      a.push({level:'critical', text:`SpO2 ${v.spo2}% — Significant hypoxemia. Apply supplemental O2; titrate to SpO2 ≥92–95%. Assess lung sounds. Notify provider.`, correct:true});
+    else if(spo2 < 95)
+      a.push({level:'warning', text:`SpO2 ${v.spo2}% — Below target. Apply or increase supplemental O2; reassess lung sounds and work of breathing.`, correct:true});
+  }
+
+  // ── TEMPERATURE ─────────────────────────────────────────────────
+  if(v.temp) {
+    if(tempF >= 104.0) {
+      a.push({level:'critical', text:`Temp ${v.temp}°F — High fever. Assess for sepsis, CNS infection, heat stroke. Cooling measures and provider notification.`, correct:true});
+      a.push({level:'warning',  text:`Temp ${v.temp}°F — High fever. Apply ice packs to bilateral axillae and groin for rapid temperature reduction.`, correct:false});
+    }
+    else if(tempF > 100.9)
+      a.push({level:'warning', text:`Temp ${v.temp}°F — Fever. Assess for infection source. Obtain cultures before antibiotics if ordered. Monitor trend.`, correct:true});
+    else if(tempF < 96.8) {
+      a.push({level:'critical', text:`Temp ${v.temp}°F — Hypothermia. Assess for sepsis, exposure, or shock. Active rewarming. Notify provider.`, correct:true});
+      a.push({level:'warning',  text:`Temp ${v.temp}°F — Hypothermia. Administer warmed IV fluids at 42°C without provider order to restore core temp.`, correct:false});
+    }
+    else if(tempF < 97.7)
+      a.push({level:'warning', text:`Temp ${v.temp}°F — Low-normal. Monitor trend; assess for early sepsis, exposure, or medication effect.`, correct:true});
+  }
+
+  // ── AVPU ────────────────────────────────────────────────────────
+  if(v.avpu && v.avpu !== 'A') {
+    a.push({level:'critical', text:`AVPU: ${v.avpu} — Altered level of consciousness. Assess cause: hypoxia, hypoglycemia, hypotension, medication, neuro event. Notify provider.`, correct:true});
+    a.push({level:'warning',  text:`AVPU: ${v.avpu} — Altered LOC. Position patient flat without HOB elevation to maximize cerebral blood flow.`, correct:false});
+  }
+
+  // ── PAIN ────────────────────────────────────────────────────────
+  if(v.pain) {
+    if(pain >= 8) {
+      a.push({level:'critical', text:`Pain ${v.pain}/10 — Severe. Assess character, location, radiation, onset. Uncontrolled pain drives physiologic stress response.`, correct:true});
+      a.push({level:'warning',  text:`Pain ${v.pain}/10 — Severe pain. Administer maximum ordered opioid dose immediately without further assessment.`, correct:false});
+    }
+    else if(pain >= 5)
+      a.push({level:'warning', text:`Pain ${v.pain}/10 — Moderate. Reassess pain quality and location; implement ordered analgesic and non-pharmacologic measures.`, correct:true});
+  }
+
+  // ── COMPOSITE PATTERNS ──────────────────────────────────────────
+  // SIRS pattern (2+ criteria)
+  const sirsCriteria = [];
+  if(v.temp && (tempF > 100.9 || tempF < 96.8)) sirsCriteria.push('Temp');
+  if(v.hr && hr > 90) sirsCriteria.push('HR');
+  if(v.rr && rr > 20) sirsCriteria.push('RR');
+  if(sirsCriteria.length >= 2)
+    a.push({level:'critical', text:`🚨 SIRS pattern: ${sirsCriteria.join(' + ')} — ${sirsCriteria.length}/3 criteria met. Assess for sepsis source. Notify provider.`, correct:true});
+
+  // Shock triad
+  if(v.sbp && v.hr && sbp < 90 && hr > 100)
+    a.push({level:'critical', text:`🚨 Hypotension + Tachycardia — shock pattern. Identify type: hypovolemic, distributive, cardiogenic, obstructive. Notify provider immediately.`, correct:true});
+
+  // Hypoxia + tachycardia
+  if(v.spo2 && v.hr && spo2 < 92 && hr > 100)
+    a.push({level:'critical', text:`🚨 Hypoxemia + Tachycardia — assess for PE, pneumothorax, acute pulmonary process. Notify provider.`, correct:true});
+
+  // Respiratory failure pattern
+  if(v.rr && v.spo2 && (rr > 24 || rr < 10) && spo2 < 92)
+    a.push({level:'critical', text:`🚨 Abnormal RR + Hypoxemia — respiratory compromise pattern. Prepare for escalated airway management. Notify provider immediately.`, correct:true});
+
+  // Bradycardia + hypotension
+  if(v.sbp && v.hr && sbp < 90 && hr < 60)
+    a.push({level:'critical', text:`🚨 Bradycardia + Hypotension — hemodynamic instability. Consider vagal response, heart block, beta-blocker toxicity. ACLS protocol may apply.`, correct:true});
+
+  // High fever + altered LOC
+  if(v.temp && v.avpu && tempF >= 103 && v.avpu !== 'A')
+    a.push({level:'critical', text:`🚨 High fever + Altered LOC — CNS infection or septic encephalopathy possible. Urgent provider notification.`, correct:true});
+
+  return a;
+}
+
+function renderAlerts(alerts) {
+  const sec=document.getElementById('alert-section');
+  const list=document.getElementById('alert-list');
+  const disc=document.getElementById('disclaimer');
+  if(!alerts.length){sec.style.display='none';return;}
+  sec.style.display='block';
+  list.innerHTML=alerts.map(a=>`
+    <div class="alert-item ${a.level}">
+      <span class="aicon">${a.level==='critical'?'🔴':'🟡'}</span>
+      <span>${a.text}</span>
+    </div>`).join('');
+  disc.textContent = alerts.some(a=>!a.correct)
+    ? '⚠️ Clinical alerts may contain errors. Verify all recommendations against evidence-based practice before acting.' : '';
+}
+
+// ── Submit Vitals ──────────────────────────────────────────────────
+async function submitVitals() {
+  const v = {
+    simTime: document.getElementById('vs-simtime').value.trim() || '—',
+    sbp:  document.getElementById('vs-sbp').value,
+    dbp:  document.getElementById('vs-dbp').value,
+    hr:   document.getElementById('vs-hr').value,
+    rr:   document.getElementById('vs-rr').value,
+    spo2: document.getElementById('vs-spo2').value,
+    temp: document.getElementById('vs-temp').value,
+    pain: document.getElementById('vs-pain').value,
+    avpu: document.getElementById('vs-avpu').value,
+    sessionId: window._sessionId || localStorage.getItem('atu_session_id') || 'unknown',
+    wallTime: new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}),
+    timestamp: Date.now()
+  };
+  if(!v.sbp && !v.hr){alert('Enter at least SBP or HR.');return;}
+
+  const news = calcNEWS2(v);
+  v.news = news;
+
+  const btn = document.getElementById('submit-btn');
+  btn.disabled=true; btn.textContent='Saving...';
+  try { await fbPost(v); } catch(e){ console.warn('Firebase error',e); }
+  myEntries.unshift(v);
+  btn.disabled=false; btn.textContent='Submit Vitals';
+
+  ['vs-simtime','vs-sbp','vs-dbp','vs-hr','vs-rr','vs-spo2','vs-temp','vs-pain'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('vs-avpu').value='A';
+
+  const toast=document.getElementById('toast');
+  toast.classList.add('show');
+  setTimeout(()=>toast.classList.remove('show'),3000);
+
+  const ns = newsStyle(news);
+  const box=document.getElementById('news-box');
+  const circle=document.getElementById('news-circle');
+  const label=document.getElementById('news-label');
+  box.style.borderColor=ns.bg; circle.style.background=ns.bg; circle.style.color=ns.fg;
+  circle.textContent=news; label.style.color=ns.bg; label.textContent=ns.label;
+  document.getElementById('news-section').style.display='block';
+
+  renderAlerts(getAlerts(v));
+  buildMyLog();
+}
+
+// ── Build Log ──────────────────────────────────────────────────────
+function buildMyLog() {
+  const body=document.getElementById('log-body');
+  const title=document.getElementById('log-title');
+  if(!myEntries.length){
+    body.innerHTML=`<tr><td colspan="10"><div class="empty">No entries yet. Submit your first vital signs above.</div></td></tr>`;
+    title.textContent='My Vital Signs — This Session';
+    return;
+  }
+  title.textContent=`My Vital Signs — ${myEntries.length} ${myEntries.length===1?'entry':'entries'}`;
+  body.innerHTML=myEntries.map((e,i)=>{
+    const sbp=parseFloat(e.sbp);
+    const bpC=sbp>=180?'#e74c3c':sbp<90?'#2980b9':sbp>=140?'#e67e22':'#333';
+    const hrC=parseFloat(e.hr)>100||parseFloat(e.hr)<60?'#e67e22':parseFloat(e.hr)>150||parseFloat(e.hr)<40?'#e74c3c':'#333';
+    const rrC=parseFloat(e.rr)>20?'#e67e22':parseFloat(e.rr)<10?'#e74c3c':'#333';
+    const spo2C=parseFloat(e.spo2)<92?'#e74c3c':parseFloat(e.spo2)<95?'#e67e22':'#333';
+    const painC=parseFloat(e.pain)>=8?'#e74c3c':parseFloat(e.pain)>=5?'#e67e22':'#333';
+    const avpuC=e.avpu!=='A'?'#e74c3c':'#333';
+    const tempF=parseFloat(e.temp);
+    const tempC=tempF>100.9?'#e67e22':tempF<96.8?'#2980b9':'#333';
+    const ns=newsStyle(e.news);
+    const rowC=i===0?'latest':i%2===0?'alt':'';
+    return `<tr class="${rowC}">
+      <td style="font-weight:700;color:var(--green);">${e.simTime}${i===0?'<span class="latest-badge">LATEST</span>':''}</td>
+      <td style="color:#999;font-size:12px;">${e.wallTime}</td>
+      <td style="font-weight:700;color:${bpC};">${e.sbp||'—'}/${e.dbp||'—'}</td>
+      <td style="color:${hrC};">${e.hr||'—'}</td>
+      <td style="color:${rrC};">${e.rr||'—'}</td>
+      <td style="color:${spo2C};">${e.spo2||'—'}%</td>
+      <td style="color:${tempC};">${e.temp||'—'}°F</td>
+      <td style="color:${painC};">${e.pain||'—'}/10</td>
+      <td style="color:${avpuC};font-weight:${e.avpu!=='A'?700:400};">${e.avpu}</td>
+      <td><span class="news-pill" style="background:${ns.bg};color:${ns.fg};">${e.news}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+// ── Load previous entries on return ───────────────────────────────
+async function loadMyEntries() {
+  let sessionId = localStorage.getItem('atu_session_id');
+  if(!sessionId){
+    sessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2,6);
+    localStorage.setItem('atu_session_id', sessionId);
+  }
+  window._sessionId = sessionId;
+  try {
+    const res = await fetch(DB + '.json');
+    const data = await res.json();
+    if(data){
+      myEntries = Object.values(data)
+        .filter(e => e.sessionId === sessionId)
+        .sort((a,b) => (b.timestamp||0) - (a.timestamp||0));
+      buildMyLog();
+    } else { buildMyLog(); }
+  } catch(e){ buildMyLog(); }
+}
+
+async function checkConn() {
+  try {
+    await fetch(DB + ".json");
+    document.getElementById('conn-dot').className = 'status-dot connected';
+    document.getElementById('conn-text').textContent = 'Connected';
+  } catch {
+    document.getElementById('conn-dot').className = 'status-dot error';
+    document.getElementById('conn-text').textContent = 'Offline';
+  }
+}
+
+window.onload = function(){ checkConn(); loadMyEntries(); };
+</script>
+</body>
+</html>
